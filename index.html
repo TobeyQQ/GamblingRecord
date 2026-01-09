@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gambling全紀錄">
+    <link rel="apple-touch-icon" href="icon.png">
+
+       <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%232d6a4f'/%3E%3Crect x='30' y='25' width='120' height='130' rx='15' fill='%23f9f6f2'/%3E%3Ctext x='90' y='115' font-family='Noto Sans TC, sans-serif' font-weight='900' font-size='85' fill='%232d6a4f' text-anchor='middle'%3E發%3C/text%3E%3C/svg%3E">
+
+    <title>Gambling全紀錄 🌸 V4.0 Multi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        :root { 
+            --milk-tea: #c8ad93; 
+            --cream: #f9f6f2; 
+            --beige: #e8e0d5; 
+            --dark-tea: #8d7763; 
+            --fortune-green: #2d6a4f; 
+            --mahjong-green: #1a4d36;
+        }
+        * { font-family: 'Noto Sans TC', sans-serif !important; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--cream); color: #5d544b; }
+        
+        /* 頂部 Icon 動效優化 */
+        .fortune-tile {
+            background: linear-gradient(145deg, #2d6a4f, #1a4d36);
+            color: white;
+            box-shadow: 0 4px 15px rgba(45, 106, 79, 0.3);
+        }
+        .calendar-day { min-height: 95px; border-right: 1px solid #f0ede9; border-bottom: 1px solid #f0ede9; background: white; transition: background 0.2s; position: relative; }
+        .calendar-day:active { background: var(--beige); }
+        .card-shadow { box-shadow: 0 10px 25px -5px rgba(200, 173, 147, 0.2); }
+        
+        .type-tag { font-size: 8px; padding: 1px 4px; border-radius: 4px; font-weight: 900; margin-top: 2px; display: inline-block; }
+        .tag-mahjong { background: #dcfce7; color: #166534; }
+        .tag-dice { background: #fef9c3; color: #854d0e; }
+        .tag-stock { background: #dbeafe; color: #1e40af; }
+        .tag-other { background: #f3f4f6; color: #374151; }
+
+        .win-toggle { transition: all 0.2s; cursor: pointer; width: 60px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: 900; font-size: 12px; }
+        .win-toggle.win { background: #dcfce7; color: #166534; border: 2px solid #bbf7d0; }
+        .win-toggle.loss { background: #fee2e2; color: #991b1b; border: 2px solid #fecaca; }
+        
+        #errorToast { transition: all 0.4s; transform: translate(-50%, 100px); opacity: 0; left: 50%; position: fixed; bottom: 24px; z-index: 100; }
+        #errorToast.show { transform: translate(-50%, 0); opacity: 1; }
+
+        /* 列表視圖樣式 */
+        .record-item { transition: transform 0.1s; }
+        .record-item:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="min-h-screen p-3 md:p-6 pb-24 text-sm">
+
+    <div class="max-w-6xl mx-auto space-y-4 md:space-y-6">
+        <header class="flex flex-col md:flex-row justify-between items-center bg-white rounded-[2rem] p-5 md:p-8 card-shadow border border-white">
+            <div class="text-center md:text-left mb-4 md:mb-0">
+                <h1 class="text-xl md:text-3xl font-black text-[#8d7763] flex items-center justify-center md:justify-start gap-3">
+                    <!-- SVG 可愛麻將 Icon -->
+                    <div class="fortune-tile w-12 h-12 md:w-16 md:h-16 flex items-center justify-center rounded-[1rem] shadow-inner relative overflow-hidden">
+                        <span class="text-2xl md:text-4xl relative z-10">發</span>
+                        <div class="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full opacity-30 blur-sm"></div>
+                    </div> 
+                    <span>Gambling 全紀錄</span>
+                </h1>
+                <p class="text-[#b5a391] text-[10px] mt-1 font-bold tracking-widest uppercase">Universal Tracker V4.0 • Multi-Record Support</p>
+            </div>
+            
+            <div class="flex items-center bg-[#fdfbf9] rounded-full p-1 border border-[#ece7e2]">
+                <button id="prevMonthBtn" class="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center font-black">&lt;</button>
+                <span id="currentMonthDisplay" class="text-xs md:text-sm font-black text-[#7a6a5b] w-24 md:w-32 text-center">...</span>
+                <button id="nextMonthBtn" class="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center font-black">&gt;</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+            <div class="lg:col-span-4 space-y-4">
+                <div class="bg-white rounded-[2rem] p-6 card-shadow border border-white">
+                    <h2 class="text-[10px] font-black text-[#7a6a5b] mb-4 flex items-center gap-2 uppercase tracking-widest">
+                        <span class="w-1 h-3 bg-[#c8ad93] rounded-full"></span> 本月分類損益 / 勝率
+                    </h2>
+                    <div id="typeStatsList" class="space-y-3"></div>
+                    <div class="mt-6 pt-4 border-t border-dashed border-gray-200">
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">年度總盈虧</label>
+                        <div id="statYearProfit" class="text-2xl font-black text-[#8d7763]">$0</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-[2rem] p-6 card-shadow border border-white">
+                    <h2 class="text-[10px] font-black text-[#7a6a5b] mb-4 flex items-center gap-2 uppercase tracking-widest">
+                        <span class="w-1 h-3 bg-[#2d6a4f] rounded-full"></span> 雀友勝率排行
+                    </h2>
+                    <div id="friendStatsList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8">
+                <div class="bg-white rounded-[2.5rem] shadow-xl border border-white overflow-hidden">
+                    <div class="grid grid-cols-7 bg-[#fdfbf9] text-center py-4 border-b border-[#f0ede9] font-black text-[9px] text-[#b5a391]">
+                        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                    </div>
+                    <div id="calendarGrid" class="grid grid-cols-7 bg-[#f0ede9] gap-px"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗內容 -->
+    <div id="recordModal" class="fixed inset-0 bg-[#5d544b]/60 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-6 md:p-8 max-h-[90vh] overflow-y-auto shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-6 right-6 text-3xl text-[#b5a391] hover:text-[#8d7763] transition-colors z-10">&times;</button>
+            
+            <div class="mb-6">
+                <h3 class="text-xl font-black text-[#5d544b]">紀錄今日戰果</h3>
+                <p id="modalDateDisplay" class="text-[10px] font-bold text-[#c8ad93] tracking-widest uppercase"></p>
+            </div>
+
+            <!-- VIEW 1: 列表模式 -->
+            <div id="listView" class="hidden space-y-4">
+                <div id="dayTotalProfit" class="text-center p-4 bg-[#fdfbf9] rounded-2xl border border-[#f0ede9]">
+                    <span class="text-[10px] text-[#b5a391] uppercase font-bold block">本日總損益</span>
+                    <span class="text-2xl font-black text-[#8d7763]">$0</span>
+                </div>
+                
+                <div id="recordsListContainer" class="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                    <!-- JS 生成列表項目 -->
+                </div>
+
+                <button onclick="switchToForm()" class="w-full py-3 bg-[#2d6a4f] text-white rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    <span class="text-lg">+</span> 新增一筆紀錄
+                </button>
+            </div>
+            
+            <!-- VIEW 2: 表單模式 -->
+            <form id="recordForm" class="hidden space-y-4">
+                <input type="hidden" id="inputDate">
+                <input type="hidden" id="inputRecordIndex"> <!-- 用於標記正在編輯哪一筆，-1 為新增 -->
+                
+                <div class="bg-[#f9f6f2] p-2 rounded-2xl flex gap-1 border border-[#f0ede9]">
+                    <button type="button" onclick="switchType('mahjong')" class="type-btn flex-1 py-2 rounded-xl text-[10px] font-black transition-all bg-[#c8ad93] text-white" id="btn-mahjong">麻將</button>
+                    <button type="button" onclick="switchType('dice')" class="type-btn flex-1 py-2 rounded-xl text-[10px] font-black transition-all text-[#b5a391]" id="btn-dice">骰寶</button>
+                    <button type="button" onclick="switchType('stock')" class="type-btn flex-1 py-2 rounded-xl text-[10px] font-black transition-all text-[#b5a391]" id="btn-stock">當沖</button>
+                    <button type="button" onclick="switchType('other')" class="type-btn flex-1 py-2 rounded-xl text-[10px] font-black transition-all text-[#b5a391]" id="btn-other">其他</button>
+                </div>
+                <input type="hidden" id="inputType" value="mahjong">
+
+                <div id="areaProfit" class="bg-[#fdfbf9] p-5 rounded-[1.5rem] border border-[#f0ede9] shadow-inner">
+                    <label class="block text-[10px] font-bold text-[#b5a391] mb-2 uppercase text-center">單筆損益 (TWD)</label>
+                    <input type="number" id="inputProfit" required class="w-full text-center text-3xl font-black text-[#8d7763] bg-transparent outline-none" placeholder="0">
+                </div>
+
+                <!-- 麻將專用 -->
+                <div id="areaMahjong" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">底 / 台</label>
+                            <div class="flex items-center gap-1 font-bold">
+                                <input type="number" id="inputBase" class="w-full bg-transparent outline-none text-xs" value="200">
+                                <span class="text-gray-300">/</span>
+                                <input type="number" id="inputPoint" class="w-full bg-transparent outline-none text-xs" value="50">
+                            </div>
+                        </div>
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">將數</label>
+                            <input type="number" id="inputRounds" class="w-full bg-transparent font-bold outline-none text-xs" value="1">
+                        </div>
+                    </div>
+                    <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                        <label class="text-[9px] font-bold text-[#b5a391] block mb-1">對戰地點</label>
+                        <input type="text" id="inputLocation" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="例如：某某招待所">
+                    </div>
+                    <div class="space-y-2 pt-2">
+                        <label class="text-[10px] font-black text-[#b5a391] block uppercase tracking-tighter">對手快速紀錄</label>
+                        <div class="flex items-center gap-2"><input type="text" id="p2_name" placeholder="對手 2" class="w-full p-2 text-xs bg-[#f9f6f2] rounded-lg outline-none"><div id="p2_status" onclick="toggleWin('p2')" class="win-toggle win">勝</div></div>
+                        <div class="flex items-center gap-2"><input type="text" id="p3_name" placeholder="對手 3" class="w-full p-2 text-xs bg-[#f9f6f2] rounded-lg outline-none"><div id="p3_status" onclick="toggleWin('p3')" class="win-toggle win">勝</div></div>
+                        <div class="flex items-center gap-2"><input type="text" id="p4_name" placeholder="對手 4" class="w-full p-2 text-xs bg-[#f9f6f2] rounded-lg outline-none"><div id="p4_status" onclick="toggleWin('p4')" class="win-toggle win">勝</div></div>
+                    </div>
+                </div>
+
+                <!-- 骰寶專用 -->
+                <div id="areaDice" class="hidden space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">外幣金額</label>
+                            <input type="number" id="diceForeign" oninput="calcDice()" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="0">
+                        </div>
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">幣別</label>
+                            <select id="diceCurrency" onchange="fetchExchangeRate()" class="w-full bg-transparent font-bold outline-none text-xs">
+                                <option value="HKD" selected>HKD (港幣)</option>
+                                <option value="USD">USD (美金)</option>
+                                <option value="JPY">JPY (日幣)</option>
+                                <option value="CNY">CNY (人民幣)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                        <label class="text-[9px] font-bold text-[#b5a391] block mb-1">即時參考買入匯率</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="diceRate" step="0.0001" oninput="calcDice()" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="載入中...">
+                            <div id="rateLoader" class="hidden animate-spin rounded-full h-3 w-3 border-2 border-[#c8ad93] border-t-transparent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 當沖專用 -->
+                <div id="areaStock" class="hidden space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">股票代號</label>
+                            <input type="text" id="stockId" onblur="fetchStockName()" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="代號 (如: 2330)">
+                        </div>
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">股票名稱</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="stockName" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="自動帶出">
+                                <div id="stockLoader" class="hidden animate-spin rounded-full h-3 w-3 border-2 border-[#c8ad93] border-t-transparent"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">張數</label>
+                            <input type="number" id="stockQty" step="0.1" class="w-full bg-transparent font-bold outline-none text-xs" value="1">
+                        </div>
+                        <div class="bg-[#fdfbf9] p-3 rounded-2xl border border-[#f0ede9]">
+                            <label class="text-[9px] font-bold text-[#b5a391] block mb-1">進場/備註</label>
+                            <input type="text" id="stockPriceNote" class="w-full bg-transparent font-bold outline-none text-xs" placeholder="價位或備註">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 其他類別 -->
+                <div id="areaOther" class="hidden space-y-3">
+                    <div class="bg-[#fdfbf9] p-4 rounded-2xl border border-[#f0ede9]">
+                        <label class="text-[9px] font-bold text-[#b5a391] block mb-2">活動項目 / 備註內容</label>
+                        <textarea id="otherNote" rows="3" class="w-full bg-transparent font-bold outline-none text-xs resize-none" placeholder="輸入紀錄內容 (如: 運彩、百家樂項目...)"></textarea>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <button type="button" onclick="switchToList()" class="py-4 bg-[#f0ede9] text-[#8d7763] rounded-2xl font-black text-xs shadow-sm active:scale-95 transition-transform">取消</button>
+                    <button type="submit" class="py-4 bg-[#2d6a4f] text-white rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-transform">儲存單筆</button>
+                </div>
+                <button type="button" id="deleteBtn" onclick="deleteRecord()" class="w-full py-2 text-red-300 text-[10px] font-bold hidden">刪除此筆</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="syncIndicator" class="fixed bottom-6 right-6 bg-white px-4 py-2 rounded-full shadow-lg border border-[#f0ede9] text-[10px] font-black text-[#7a6a5b] hidden">同步中...</div>
+    <div id="errorToast" class="bg-[#8d7763] text-white px-6 py-4 rounded-2xl text-[11px] font-bold shadow-2xl"><span id="errorMsg"></span></div>
+
+    <script>
+        let scriptUrl = "https://script.google.com/macros/s/AKfycbxf41JEao3uyv_H4QzNlrhmjgJEEDMw30jNsnCVJOnIY6WnxF31vWYCTZRzLpw12uvv/exec"; 
+        let records = JSON.parse(localStorage.getItem('gambling_records') || '{}');
+        let currentYear = new Date().getFullYear(), currentMonth = new Date().getMonth();
+
+        const TYPE_MAP = {
+            mahjong: { label: '麻將', color: 'tag-mahjong' },
+            dice: { label: '骰寶', color: 'tag-dice' },
+            stock: { label: '當沖', color: 'tag-stock' },
+            other: { label: '其他', color: 'tag-other' }
+        };
+
+        window.onload = () => { 
+            migrateData(); // 確保資料結構升級
+            renderApp(); 
+            if(scriptUrl) syncFromCloud(); 
+        };
+
+        // 資料遷移：確保所有資料都是 Array 格式
+        function migrateData() {
+            let changed = false;
+            Object.keys(records).forEach(key => {
+                if (!Array.isArray(records[key])) {
+                    // 如果發現舊格式(物件)，轉為Array
+                    records[key] = [records[key]];
+                    changed = true;
+                }
+                // 確保每個紀錄都有 ID
+                records[key].forEach(r => {
+                    if(!r.id) { r.id = Date.now() + Math.random().toString(36).substr(2, 5); changed = true; }
+                });
+            });
+            if(changed) localStorage.setItem('gambling_records', JSON.stringify(records));
+        }
+
+        function renderApp() {
+            document.getElementById('currentMonthDisplay').innerText = `${currentYear}年 ${currentMonth + 1}月`;
+            renderOverallStats(); 
+            renderCalendar();
+        }
+
+        function renderOverallStats() {
+            let yProfit = 0;
+            const currentMonthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+            const typeStats = { mahjong: { p:0, w:0, t:0 }, dice: { p:0, w:0, t:0 }, stock: { p:0, w:0, t:0 }, other: { p:0, w:0, t:0 } };
+
+            Object.entries(records).forEach(([dateKey, list]) => {
+                if (!Array.isArray(list)) list = [list]; // 防呆
+                
+                // 年度總和
+                if (dateKey.startsWith(currentYear)) {
+                    list.forEach(r => yProfit += (r.p1_score || 0));
+                }
+
+                // 月度統計
+                if (dateKey.startsWith(currentMonthPrefix)) {
+                    list.forEach(r => {
+                        const type = r.type || 'mahjong';
+                        if (!typeStats[type]) typeStats[type] = { p:0, w:0, t:0 }; // 防未定義
+                        typeStats[type].p += (r.p1_score || 0);
+                        typeStats[type].t += 1;
+                        if (r.p1_score > 0) typeStats[type].w += 1;
+                    });
+                }
+            });
+
+            document.getElementById('statYearProfit').innerText = '$' + yProfit.toLocaleString();
+
+            document.getElementById('typeStatsList').innerHTML = Object.entries(typeStats).map(([k, v]) => {
+                if(v.t === 0) return '';
+                const winRate = Math.round((v.w / v.t) * 100);
+                return `<div class="bg-white p-4 rounded-3xl border border-[#f0ede9] shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="type-tag ${TYPE_MAP[k].color} px-2 py-1 text-[10px]">${TYPE_MAP[k].label}</span>
+                        <div class="text-right">
+                           <div class="text-[9px] font-black text-gray-300 uppercase">Win Rate</div>
+                           <div class="text-[11px] font-black text-[#2d6a4f]">${winRate}%</div>
+                        </div>
+                    </div>
+                    <div class="text-xl md:text-2xl font-black ${v.p >= 0 ? 'text-green-600' : 'text-red-500'}">
+                        ${v.p >= 0 ? '+' : ''}${v.p.toLocaleString()}
+                    </div>
+                    <div class="text-[9px] text-gray-400 mt-1">共 ${v.t} 場紀錄</div>
+                </div>`;
+            }).join('') || '<p class="text-[10px] text-gray-300 text-center py-4">本月無數據</p>';
+            renderFriendStats();
+        }
+
+        function renderFriendStats() {
+            const friends = {};
+            Object.values(records).forEach(list => {
+                list.forEach(r => {
+                    if(r.type && r.type !== 'mahjong') return;
+                    ['p2', 'p3', 'p4'].forEach(p => {
+                        const name = r[`${p}_name`];
+                        if (name && name.trim()) {
+                            if (!friends[name]) friends[name] = { win: 0, total: 0 };
+                            friends[name].total++;
+                            if (r[`${p}_score`] > 0) friends[name].win++;
+                        }
+                    });
+                });
+            });
+            const sorted = Object.entries(friends).map(([name, stat]) => ({ name, rate: Math.round((stat.win/stat.total)*100) })).sort((a,b)=>b.rate-a.rate).slice(0,5);
+            document.getElementById('friendStatsList').innerHTML = sorted.map(f => `
+                <div class="flex items-center justify-between bg-[#fdfbf9] p-2 rounded-xl">
+                    <span class="text-[11px] font-bold truncate">${f.name}</span>
+                    <span class="text-[11px] font-black text-[#2d6a4f]">${f.rate}%</span>
+                </div>
+            `).join('') || '<p class="text-[10px] text-gray-300 text-center py-4">無對手紀錄</p>';
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid'); grid.innerHTML = '';
+            const first = new Date(currentYear, currentMonth, 1).getDay();
+            const last = new Date(currentYear, currentMonth + 1, 0).getDate();
+            for(let i=0; i<first; i++) grid.appendChild(document.createElement('div'));
+            
+            for(let d=1; d<=last; d++) {
+                const dateKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const cell = document.createElement('div');
+                cell.className = "calendar-day p-1 cursor-pointer flex flex-col items-center";
+                cell.innerHTML = `<span class="text-[9px] font-black text-gray-300 mb-1">${d}</span>`;
+                
+                if(records[dateKey] && records[dateKey].length > 0) {
+                    const list = records[dateKey];
+                    // 計算當日總損益
+                    const totalScore = list.reduce((sum, r) => sum + (Number(r.p1_score)||0), 0);
+                    // 找出損益絕對值最大的項目來決定標籤顏色，或者顯示 "Mix"
+                    const maxImpact = list.reduce((prev, curr) => Math.abs(curr.p1_score) > Math.abs(prev.p1_score) ? curr : prev, list[0]);
+                    const typeLabel = list.length > 1 ? '多筆' : TYPE_MAP[maxImpact.type||'mahjong'].label;
+                    const typeColor = list.length > 1 ? 'bg-gray-200 text-gray-600' : TYPE_MAP[maxImpact.type||'mahjong'].color;
+
+                    cell.innerHTML += `<div class="text-[10px] font-black ${totalScore>=0?'text-green-600':'text-red-400'}">${totalScore>0?'+':''}${totalScore}</div>`;
+                    cell.innerHTML += `<div class="type-tag ${typeColor}">${typeLabel}</div>`;
+                }
+                cell.onclick = () => openModal(dateKey);
+                grid.appendChild(cell);
+            }
+        }
+
+        /* 彈窗邏輯重構 */
+        function openModal(date) {
+            document.getElementById('inputDate').value = date;
+            document.getElementById('modalDateDisplay').innerText = date.replace(/-/g, ' / ');
+            
+            const list = records[date] || [];
+            
+            if (list.length === 0) {
+                // 如果當天沒紀錄，直接進入新增模式
+                resetForm();
+                switchToForm(); 
+            } else {
+                // 如果有紀錄，進入列表模式
+                renderRecordList(list);
+                switchToList();
+            }
+            
+            document.getElementById('recordModal').classList.remove('hidden');
+        }
+
+        function switchToList() {
+            document.getElementById('listView').classList.remove('hidden');
+            document.getElementById('recordForm').classList.add('hidden');
+        }
+
+        function switchToForm() {
+            document.getElementById('listView').classList.add('hidden');
+            document.getElementById('recordForm').classList.remove('hidden');
+            // 如果從列表按過來的，且現在是新增模式，需要隱藏刪除按鈕
+            const idx = document.getElementById('inputRecordIndex').value;
+            document.getElementById('deleteBtn').classList.toggle('hidden', idx === '-1');
+        }
+
+        function renderRecordList(list) {
+            const container = document.getElementById('recordsListContainer');
+            const totalEl = document.querySelector('#dayTotalProfit span:last-child');
+            container.innerHTML = '';
+            
+            let total = 0;
+            list.forEach((r, index) => {
+                total += (Number(r.p1_score) || 0);
+                
+                const div = document.createElement('div');
+                div.className = "record-item bg-white p-3 rounded-2xl border border-[#f0ede9] shadow-sm flex items-center justify-between cursor-pointer hover:bg-[#fdfbf9]";
+                div.onclick = () => loadRecordToForm(index);
+
+                let desc = r.type === 'mahjong' ? (r.location || '麻將局') : 
+                          r.type === 'stock' ? (r.stock_name || r.stock_id || '當沖') : 
+                          r.type === 'dice' ? '骰寶/外匯' : (r.other_note || '其他');
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="type-tag ${TYPE_MAP[r.type].color} px-2 py-1 text-[10px]">${TYPE_MAP[r.type].label}</span>
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-bold text-[#5d544b] truncate max-w-[120px]">${desc}</span>
+                            <span class="text-[9px] text-[#b5a391]">${r.type==='mahjong' ? (r.rounds+'將') : ''}</span>
+                        </div>
+                    </div>
+                    <span class="text-sm font-black ${r.p1_score>=0?'text-green-600':'text-red-400'}">
+                        ${r.p1_score>=0?'+':''}${r.p1_score}
+                    </span>
+                `;
+                container.appendChild(div);
+            });
+
+            totalEl.innerText = (total >= 0 ? '+' : '') + total.toLocaleString();
+            totalEl.className = `text-2xl font-black ${total >= 0 ? 'text-[#8d7763]' : 'text-red-400'}`;
+        }
+
+        function resetForm() {
+            document.getElementById('inputRecordIndex').value = '-1'; // -1 代表新增
+            document.getElementById('inputProfit').value = '';
+            // 重置為預設
+            switchType('mahjong');
+            document.getElementById('inputBase').value = 200;
+            document.getElementById('inputPoint').value = 50;
+            document.getElementById('inputRounds').value = 1;
+            document.getElementById('inputLocation').value = "";
+            ['p2','p3','p4'].forEach(p => {
+                document.getElementById(`${p}_name`).value = '';
+                document.getElementById(`${p}_status`).className = 'win-toggle win';
+                document.getElementById(`${p}_status`).innerText = '勝';
+            });
+            document.getElementById('diceForeign').value = "";
+            document.getElementById('stockId').value = "";
+            document.getElementById('stockName').value = "";
+            document.getElementById('otherNote').value = "";
+        }
+
+        function loadRecordToForm(index) {
+            const date = document.getElementById('inputDate').value;
+            const r = records[date][index];
+            
+            document.getElementById('inputRecordIndex').value = index;
+            
+            switchType(r.type || 'mahjong');
+            document.getElementById('inputProfit').value = r.p1_score || 0;
+            
+            // 麻將
+            document.getElementById('inputBase').value = r.base || 200;
+            document.getElementById('inputPoint').value = r.point || 50;
+            document.getElementById('inputRounds').value = r.rounds || 1;
+            document.getElementById('inputLocation').value = r.location || "";
+            ['p2','p3','p4'].forEach(p => {
+                document.getElementById(`${p}_name`).value = r[`${p}_name`] || '';
+                const isWin = (r[`${p}_score`] > 0);
+                const el = document.getElementById(`${p}_status`);
+                el.innerText = isWin ? '勝' : '負';
+                el.className = `win-toggle ${isWin?'win':'loss'}`;
+            });
+
+            // 其他
+            document.getElementById('diceForeign').value = r.foreign_amt || "";
+            document.getElementById('diceCurrency').value = r.currency || "HKD";
+            document.getElementById('diceRate').value = r.rate || "";
+            document.getElementById('stockId').value = r.stock_id || "";
+            document.getElementById('stockName').value = r.stock_name || "";
+            document.getElementById('stockQty').value = r.stock_qty || 1;
+            document.getElementById('stockPriceNote').value = r.stock_note || "";
+            document.getElementById('otherNote').value = r.other_note || "";
+
+            switchToForm();
+        }
+
+        // --- 沿用原有的工具函式 ---
+        function switchType(type) {
+            document.getElementById('inputType').value = type;
+            document.querySelectorAll('.type-btn').forEach(btn => {
+                btn.classList.remove('bg-[#c8ad93]', 'text-white');
+                btn.classList.add('text-[#b5a391]');
+            });
+            document.getElementById(`btn-${type}`).classList.add('bg-[#c8ad93]', 'text-white');
+            
+            document.getElementById('areaMahjong').classList.toggle('hidden', type !== 'mahjong');
+            document.getElementById('areaDice').classList.toggle('hidden', type !== 'dice');
+            document.getElementById('areaStock').classList.toggle('hidden', type !== 'stock');
+            document.getElementById('areaOther').classList.toggle('hidden', type !== 'other');
+            
+            if(type === 'dice' && !document.getElementById('diceRate').value) fetchExchangeRate();
+        }
+
+        async function fetchExchangeRate() {
+            const cur = document.getElementById('diceCurrency').value;
+            const loader = document.getElementById('rateLoader');
+            const rateInput = document.getElementById('diceRate');
+            loader.classList.remove('hidden');
+            try {
+                const res = await fetch(`https://api.exchangerate-api.com/v4/latest/USD`);
+                const data = await res.json();
+                const twdBase = data.rates.TWD;
+                let rate = twdBase; 
+                if (cur === 'HKD') rate = twdBase / data.rates.HKD;
+                else if (cur === 'JPY') rate = twdBase / data.rates.JPY;
+                else if (cur === 'CNY') rate = twdBase / data.rates.CNY;
+                rateInput.value = (rate - 0.02).toFixed(4);
+            } catch(e) {
+                const fallback = { USD: 32.3, HKD: 4.12, JPY: 0.208, CNY: 4.48 };
+                rateInput.value = fallback[cur];
+            } finally { loader.classList.add('hidden'); calcDice(); }
+        }
+
+        function calcDice() {
+            const amt = Number(document.getElementById('diceForeign').value);
+            const rate = Number(document.getElementById('diceRate').value);
+            if(amt && rate) document.getElementById('inputProfit').value = Math.round(amt * rate);
+        }
+
+        async function fetchStockName() {
+            const id = document.getElementById('stockId').value.trim();
+            if(!id) return;
+            const nameEl = document.getElementById('stockName');
+            const loader = document.getElementById('stockLoader');
+            nameEl.placeholder = "查詢中...";
+            loader.classList.remove('hidden');
+            try {
+                const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo`);
+                const json = await res.json();
+                const target = json.data.find(s => s.stock_id === id);
+                if(target) nameEl.value = target.stock_name;
+                else {
+                    const resTwse = await fetch(`https://openapi.twse.com.tw/v1/stock/stock_info`);
+                    const dataTwse = await resTwse.json();
+                    const found = dataTwse.find(s => s.Code === id);
+                    nameEl.value = found ? found.Name : "查無此代號";
+                }
+            } catch(e) { nameEl.value = "手動輸入"; } finally { loader.classList.add('hidden'); }
+        }
+
+        function closeModal() { document.getElementById('recordModal').classList.add('hidden'); }
+        function toggleWin(p) {
+            const el = document.getElementById(`${p}_status`);
+            const isWin = el.innerText === '勝';
+            el.innerText = isWin ? '負' : '勝';
+            el.className = `win-toggle ${!isWin?'win':'loss'}`;
+        }
+
+        // --- 核心邏輯更新：儲存與刪除 ---
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const date = document.getElementById('inputDate').value;
+            const idx = parseInt(document.getElementById('inputRecordIndex').value);
+            
+            const payload = {
+                id: (idx !== -1 && records[date] && records[date][idx]) ? records[date][idx].id : Date.now().toString(), // 保持舊 ID 或生成新 ID
+                date: date, // 冗餘但在某些後端可能需要
+                type: document.getElementById('inputType').value,
+                p1_score: Number(document.getElementById('inputProfit').value),
+                base: Number(document.getElementById('inputBase').value),
+                point: Number(document.getElementById('inputPoint').value),
+                rounds: Number(document.getElementById('inputRounds').value),
+                location: document.getElementById('inputLocation').value,
+                p2_name: document.getElementById('p2_name').value, p2_score: document.getElementById('p2_status').innerText === '勝' ? 1 : -1,
+                p3_name: document.getElementById('p3_name').value, p3_score: document.getElementById('p3_status').innerText === '勝' ? 1 : -1,
+                p4_name: document.getElementById('p4_name').value, p4_score: document.getElementById('p4_status').innerText === '勝' ? 1 : -1,
+                foreign_amt: Number(document.getElementById('diceForeign').value),
+                currency: document.getElementById('diceCurrency').value,
+                rate: Number(document.getElementById('diceRate').value),
+                stock_id: document.getElementById('stockId').value,
+                stock_name: document.getElementById('stockName').value,
+                stock_qty: Number(document.getElementById('stockQty').value),
+                stock_note: document.getElementById('stockPriceNote').value,
+                other_note: document.getElementById('otherNote').value
+            };
+
+            if (!records[date]) records[date] = [];
+
+            if (idx === -1) {
+                // 新增
+                records[date].push(payload);
+            } else {
+                // 更新
+                records[date][idx] = payload;
+            }
+
+            saveAndRender();
+            
+            // 雲端同步部分：注意這會將單筆資料送出
+            if(scriptUrl) syncToCloud('save', payload);
+            
+            // 關閉表單，回到列表
+            closeModal();
+        }
+
+        async function deleteRecord() {
+            const date = document.getElementById('inputDate').value;
+            const idx = parseInt(document.getElementById('inputRecordIndex').value);
+            
+            if(confirm("確定刪除此筆紀錄？")) {
+                const deletedItem = records[date][idx];
+                records[date].splice(idx, 1);
+                
+                // 如果當天清空了，刪除 key
+                if(records[date].length === 0) delete records[date];
+                
+                saveAndRender();
+                closeModal();
+                
+                // 同步刪除 (傳遞 ID 或 Date)
+                if(scriptUrl) syncToCloud('delete', { date: date, id: deletedItem.id });
+            }
+        }
+
+        async function syncToCloud(action, data) {
+            if(!scriptUrl) return;
+            showIndicator(true);
+            try { await fetch(scriptUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, data }) }); } catch(e) {}
+            setTimeout(() => { syncFromCloud(); showIndicator(false); }, 1500);
+        }
+
+        async function syncFromCloud() {
+            if(!scriptUrl) return;
+            showIndicator(true);
+            try {
+                const res = await fetch(`${scriptUrl}?action=load&t=${Date.now()}`);
+                const data = await res.json();
+                if(data) { 
+                    records = data; 
+                    migrateData(); // 從雲端拉下來後也要做一次結構檢查
+                    saveAndRender(); 
+                }
+            } catch(e) {}
+            showIndicator(false);
+        }
+
+        function saveAndRender() { localStorage.setItem('gambling_records', JSON.stringify(records)); renderApp(); }
+        function showIndicator(s) { document.getElementById('syncIndicator').classList.toggle('hidden', !s); }
+        
+        document.getElementById('recordForm').onsubmit = handleFormSubmit;
+        document.getElementById('prevMonthBtn').onclick = () => { currentMonth--; if(currentMonth<0){currentMonth=11; currentYear--;} renderApp(); };
+        document.getElementById('nextMonthBtn').onclick = () => { currentMonth++; if(currentMonth>11){currentMonth=0; currentYear++;} renderApp(); };
+    </script>
+</body>
+</html>
